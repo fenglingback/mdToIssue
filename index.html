@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD to GitHub Issue</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #24292e;
+            --border-color: #e1e4e8;
+            --button-bg: #f6f8fa;
+            --button-hover: #e1e4e8;
+            --link-color: #0366d6;
+            --input-bg: #ffffff;
+            --preview-bg: #f6f8fa;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0d1117;
+                --text-color: #c9d1d9;
+                --border-color: #30363d;
+                --button-bg: #21262d;
+                --button-hover: #30363d;
+                --link-color: #58a6ff;
+                --input-bg: #0d1117;
+                --preview-bg: #161b22;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            padding: 6px 12px;
+            background-color: var(--button-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            min-width: 160px;
+            z-index: 1;
+            top: 100%;
+            left: 0;
+        }
+
+        .dropdown-content button {
+            width: 100%;
+            text-align: left;
+            border: none;
+            border-radius: 0;
+            padding: 8px 16px;
+        }
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .editor-container,
+        .preview-container {
+            flex: 1;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-container {
+            border-right: 1px solid var(--border-color);
+            gap: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+        }
+
+        textarea {
+            flex: 1;
+            resize: none;
+            font-family: monospace;
+            overflow-y: auto;
+        }
+
+        .preview {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background-color: var(--preview-bg);
+            box-shadow: 0 0 .5em rgb(64, 122, 155);
+        }
+
+        .markdown-body {
+            background-color: transparent;
+        }
+
+        footer {
+            padding: 16px;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+        }
+
+        footer a {
+            color: var(--link-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 20px;
+            border-radius: 6px;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close {
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            margin-bottom: 16px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        #tokenInput,
+        #urlInput {
+            margin: 10px 0;
+        }
+
+        .repo-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .repo-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .repo-item:last-child {
+            border-bottom: none;
+        }
+
+        .repo-item:hover {
+            background-color: var(--button-bg);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>MD to GitHub Issue</h1>
+        <div class="nav-buttons">
+            <div class="dropdown">
+                <button id="importBtn">Import</button>
+                <div class="dropdown-content">
+                    <button id="importLocalBtn">From Local</button>
+                    <button id="importUrlBtn">From URL</button>
+                </div>
+            </div>
+            <button id="clearBtn">Clear</button>
+            <button id="saveBtn">Save</button>
+            <button id="publishBtn" disabled>Publish</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="editor-container">
+            <input type="text" id="titleInput" placeholder="Issue title">
+            <textarea id="contentInput" placeholder="Write your issue content in Markdown"></textarea>
+        </div>
+        <div class="preview-container">
+            <div class="preview markdown-body" id="preview"></div>
+        </div>
+    </main>
+
+    <footer>
+        Powered by <a href="https://github.com/fenglingback" target="_blank">fenglingback</a>
+    </footer>
+
+    <!-- Modal for GitHub Token -->
+    <div class="modal" id="tokenModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">GitHub Token Required</div>
+            </div>
+            <div class="modal-body">
+                <p>Please enter your GitHub personal access token:</p>
+                <input type="text" id="tokenInput" placeholder="ghp_..." style="width: 100%;">
+                <p style="margin-top: 8px; font-size: 12px; color: var(--text-color); opacity: 0.8;">
+                    The token will be stored in your browser's localStorage.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button id="verifyTokenBtn">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for URL Input -->
+    <div class="modal" id="urlModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Import from URL</div>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Enter the URL of the Markdown file:</p>
+                <input type="text" id="urlInput" placeholder="https://..." style="width: 100%;">
+            </div>
+            <div class="modal-footer">
+                <button id="loadUrlBtn">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Repo Selection -->
+    <div class="modal" id="repoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Select Repository</div>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Select a repository to publish the issue:</p>
+                <div class="repo-list" id="repoList">
+                    <div class="repo-item">Loading repositories...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelRepoBtn">Cancel</button>
+                <button id="confirmRepoBtn" disabled>Publish</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const titleInput = document.getElementById('titleInput');
+        const contentInput = document.getElementById('contentInput');
+        const preview = document.getElementById('preview');
+        const importBtn = document.getElementById('importBtn');
+        const importLocalBtn = document.getElementById('importLocalBtn');
+        const importUrlBtn = document.getElementById('importUrlBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const publishBtn = document.getElementById('publishBtn');
+
+        // Modal elements
+        const tokenModal = document.getElementById('tokenModal');
+        const tokenInput = document.getElementById('tokenInput');
+        const verifyTokenBtn = document.getElementById('verifyTokenBtn');
+
+        const urlModal = document.getElementById('urlModal');
+        const urlInput = document.getElementById('urlInput');
+        const loadUrlBtn = document.getElementById('loadUrlBtn');
+
+        const repoModal = document.getElementById('repoModal');
+        const repoList = document.getElementById('repoList');
+        const confirmRepoBtn = document.getElementById('confirmRepoBtn');
+        const cancelRepoBtn = document.getElementById('cancelRepoBtn');
+
+        // Close buttons
+        const closeButtons = document.querySelectorAll('.close');
+
+        // State
+        let githubToken = null;
+        let selectedRepo = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkGitHubToken();
+            setupEventListeners();
+            loadFromLocalStorage();
+            updatePreview();
+        });
+
+        function setupEventListeners() {
+            // Content input
+            contentInput.addEventListener('input', updatePreview);
+
+            // Import buttons
+            importLocalBtn.addEventListener('click', handleImportLocal);
+            importUrlBtn.addEventListener('click', () => urlModal.style.display = 'flex');
+
+            // Clear button
+            clearBtn.addEventListener('click', clearEditor);
+
+            // Save button
+            saveBtn.addEventListener('click', () => {
+                saveToLocalStorage();
+                if (titleInput.value || contentInput.value) {
+                    alert('Content saved successfully!');
+                }
+            });
+
+            // Publish button
+            publishBtn.addEventListener('click', showRepoModal);
+
+            // Token modal
+            verifyTokenBtn.addEventListener('click', () => verifyGitHubToken());
+
+            // URL modal
+            loadUrlBtn.addEventListener('click', handleImportUrl);
+
+            // Repo modal
+            confirmRepoBtn.addEventListener('click', publishIssue);
+            cancelRepoBtn.addEventListener('click', () => repoModal.style.display = 'none');
+
+            // Close buttons
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tokenModal.style.display = 'none';
+                    urlModal.style.display = 'none';
+                    repoModal.style.display = 'none';
+                });
+            });
+        }
+
+        function checkGitHubToken() {
+            githubToken = localStorage.getItem('githubToken');
+
+            if (githubToken) {
+                verifyGitHubToken(githubToken);
+            } else {
+                tokenModal.style.display = 'flex';
+            }
+        }
+
+        async function verifyGitHubToken(token = null) {
+            const tokenToVerify = token || tokenInput.value.trim();
+
+            if (!tokenToVerify) {
+                alert('Please enter a GitHub token');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://api.github.com/user', {
+                    headers: {
+                        'Authorization': `token ${tokenToVerify}`
+                    }
+                });
+
+                if (response.ok) {
+                    githubToken = tokenToVerify;
+                    localStorage.setItem('githubToken', githubToken);
+                    tokenModal.style.display = 'none';
+                    publishBtn.disabled = false;
+
+                    if (!token) {
+                        alert('Token verified and saved successfully!');
+                    }
+                } else {
+                    throw new Error('Invalid token');
+                }
+            } catch (error) {
+                localStorage.removeItem('githubToken');
+                githubToken = null;
+                publishBtn.disabled = true;
+                alert('Failed to verify token: ' + error.message);
+            }
+        }
+
+        function updatePreview() {
+            preview.innerHTML = marked.parse(contentInput.value || 'Nothing to preview');
+        }
+
+        function handleImportLocal() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.md,text/markdown';
+
+            fileInput.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = event => {
+                    titleInput.value = file.name.replace('.md', '');
+                    contentInput.value = event.target.result;
+                    updatePreview();
+                    saveToLocalStorage();
+                };
+                reader.readAsText(file);
+            };
+
+            fileInput.click();
+        }
+
+        async function handleImportUrl() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const content = await response.text();
+                contentInput.value = content;
+                updatePreview();
+                saveToLocalStorage();
+                urlModal.style.display = 'none';
+                urlInput.value = '';
+            } catch (error) {
+                alert('Failed to load URL: ' + error.message);
+            }
+        }
+
+        function clearEditor() {
+            if (confirm('Are you sure you want to clear the editor?')) {
+                titleInput.value = '';
+                contentInput.value = '';
+                updatePreview();
+                saveToLocalStorage();
+            }
+        }
+
+        function saveToLocalStorage() {
+            const content = {
+                title: titleInput.value,
+                content: contentInput.value
+            };
+
+            localStorage.setItem('mdIssueContent', JSON.stringify(content));
+        }
+
+        function loadFromLocalStorage() {
+            const savedContent = localStorage.getItem('mdIssueContent');
+            if (savedContent) {
+                try {
+                    const content = JSON.parse(savedContent);
+                    titleInput.value = content.title || '';
+                    contentInput.value = content.content || '';
+                    updatePreview();
+                } catch (e) {
+                    console.error('Failed to load saved content:', e);
+                }
+            }
+        }
+
+        async function showRepoModal() {
+            if (!titleInput.value.trim()) {
+                alert('Please enter a title for the issue');
+                return;
+            }
+
+            if (!contentInput.value.trim()) {
+                alert('Please enter content for the issue');
+                return;
+            }
+
+            if (!githubToken) {
+                alert('GitHub token is required');
+                return;
+            }
+
+            repoModal.style.display = 'flex';
+            confirmRepoBtn.disabled = true;
+            repoList.innerHTML = '<div class="repo-item">Loading repositories...</div>';
+
+            try {
+                const response = await fetch('https://api.github.com/user/repos?per_page=100', {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const repos = await response.json();
+
+                if (repos.length === 0) {
+                    repoList.innerHTML = '<div class="repo-item">No repositories found</div>';
+                    return;
+                }
+
+                repoList.innerHTML = '';
+                repos.forEach(repo => {
+                    const repoItem = document.createElement('div');
+                    repoItem.className = 'repo-item';
+                    repoItem.textContent = repo.full_name;
+                    repoItem.onclick = () => {
+                        document.querySelectorAll('.repo-item').forEach(item => {
+                            item.style.backgroundColor = 'transparent';
+                        });
+                        repoItem.style.backgroundColor = 'var(--button-bg)';
+                        selectedRepo = repo.full_name;
+                        confirmRepoBtn.disabled = false;
+                    };
+                    repoList.appendChild(repoItem);
+                });
+            } catch (error) {
+                repoList.innerHTML = `<div class="repo-item">Error loading repositories: ${error.message}</div>`;
+                console.error('Failed to load repositories:', error);
+            }
+        }
+
+        async function publishIssue() {
+            if (!selectedRepo || !githubToken) {
+                alert('Please select a repository and ensure you have a valid GitHub token');
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${selectedRepo}/issues`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: titleInput.value.trim(),
+                        body: contentInput.value.trim()
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const issue = await response.json();
+                alert(`Issue created successfully!\n\nView it at: ${issue.html_url}`);
+                preview.innerHTML += `<p><a href="${issue.html_url}" target="_blank">View issue on GitHub</a></p>`;
+                repoModal.style.display = 'none';
+            } catch (error) {
+                alert('Failed to create issue: ' + error.message);
+                console.error('Failed to create issue:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
